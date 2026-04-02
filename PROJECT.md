@@ -8,6 +8,17 @@ The event is **Big Stick Shindig 2026 (BSS'26)**.
 
 ---
 
+## Current State (as of April 2026)
+
+- Worker is **live and syncing** — tickets only, every 5 minutes, incremental via cursor
+- Syncing against **`{{API TEST}}`** table — not yet switched to production `BSS'26`
+- **900 records** fully backfilled with all SP fields including transferer data
+- GitHub auto-deploy is configured — push to `main` = deployed
+- Manual sync via Airtable button automation is working
+- Main next step: **switch to production table** (`BSS'26`) when ready
+
+---
+
 ## The Big Picture
 
 Secret Party is the source of truth for tickets and invitations. Airtable is where the team does all their work — tracking attendees, sponsors, wristbands, logistics, etc. This worker bridges the two by:
@@ -28,9 +39,16 @@ Currently only syncing **tickets** (not invitations — disabled intentionally b
 | **Account ID** | e5344b6ea83eafd3e476f25942d8326c |
 | **Cloudflare plan** | Free (50 subrequest limit per invocation) |
 | **Cron** | `*/5 * * * *` — active and running |
-| **Deploy command** | `npm run deploy` |
+| **Deploy command** | `npm run deploy` (or just push to `main` — see below) |
 | **Check auth** | `npx wrangler whoami` |
 | **Tail live logs** | `npx wrangler tail` |
+
+### GitHub + Auto-deploy
+
+- **Repo:** https://github.com/brianthomas17/secret-party-sync (private)
+- **Auto-deploy:** Every push to `main` triggers `.github/workflows/deploy.yml` which deploys to Cloudflare via `cloudflare/wrangler-action@v3`
+- **GitHub secret required:** `CLOUDFLARE_API_TOKEN` — already set in repo secrets
+- **Bottom line:** Push to GitHub = deployed to production. No need to run `npm run deploy` manually unless testing locally.
 
 ---
 
@@ -89,14 +107,17 @@ This is a copy of the real `BSS'26` table used for testing the sync before going
 - `SP Purchase Price`, `SP Total`
 - `SP Is Checked In`, `SP Checkin At`
 - `SP Transfer Status`, `SP Transferee First Name`, `SP Transferee Last Name`, `SP Transferee Email`
+- `SP Transferer First Name`, `SP Transferer Last Name`, `SP Transferer Email` ← new fields created in Airtable, backfilled April 2026
 - `SP Created At`, `SP Updated At`
 - `SP Product Name` (nested: `product.name`)
 - `SP Invitation ID`
 
 **SP fields NOT yet mapped** (in SP API but not written to Airtable):
 - `promotion_code` → `Promo Code` field exists in Airtable but is `multipleSelects` type — needs to be changed to `singleLineText` first, then add to FIELD_MAP
-- `transferer_first_name` + `transferer_last_name` → `Transfer From Name` field
-- `transferer_email` → `Transferred From Email` field
+
+**Existing Airtable fields that may overlap with SP transferer fields** (to review before prod):
+- `Transfer From Name` — currently unmapped. May want to point `transferer_first_name` + `transferer_last_name` here once data is verified
+- `Transferred From Email` — currently unmapped. May want to point `transferer_email` here once data is verified
 
 ---
 
