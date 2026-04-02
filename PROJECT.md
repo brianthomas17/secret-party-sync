@@ -253,6 +253,10 @@ SP has **1,191 tickets** and **10,271 invitations** as of April 2026.
 9. Disabled invitations sync (10k+ records, too many subrequests for free plan)
 10. Added cursor nudge (+1s) to handle SP boundary bug
 11. Confirmed SP API bug: 2 specific tickets always returned regardless of cursor
+12. Added client-side cursor filter in `sync.js` — drops SP records where `updated_at <= cursor`, eliminating the phantom `Tickets Updated: 2` noise
+13. Added `SP Transferer First Name`, `SP Transferer Last Name`, `SP Transferer Email` fields to Airtable and mapped in `config.js`
+14. Hardened `backfill.js` — added `--table` flag, `--dry-run` mode, rate limiting, and retry on 429
+15. Ran backfill against `{{API TEST}}` — 900/900 records matched and patched with full SP field set including transferer data
 
 ---
 
@@ -260,13 +264,11 @@ SP has **1,191 tickets** and **10,271 invitations** as of April 2026.
 
 - [ ] **Clean up ~151 duplicate records** in `{{API TEST}}` — leftover from the bad first sync. Identify by finding records with duplicate SP IDs and delete the extras manually in Airtable
 - [ ] **Delete old cursor-only row** in `{{Sync State}}` — has `Endpoint` + `Cursor` but no `Status`/`Synced At`. Leftover from before logging refactor
-- [ ] **Map missing SP fields** to Airtable:
-  - Change `Promo Code` field type from `multipleSelects` → `singleLineText` in Airtable
-  - Add `promotion_code`, `transferer_first_name`, `transferer_last_name`, `transferer_email` to `FIELD_MAP.tickets` in `src/config.js`
-  - Redeploy
-- [ ] **Switch to production table** — change `TABLES.tickets` in `src/config.js` from `{{API TEST}}` to `BSS'26` (`tblVGGdO9QrRYi50x`), run backfill on prod table, redeploy
-- [ ] **Re-enable invitations sync** — currently commented out in `runSync()`. May need Cloudflare paid plan ($5/mo, raises limit to 1000 subrequests)
+- [ ] **Map `Promo Code`** — change field type from `multipleSelects` → `singleLineText` in Airtable, then add `promotion_code` to `FIELD_MAP.tickets` in `src/config.js` and redeploy
+- [ ] **Switch to production table** — change `TABLES.tickets` in `src/config.js` from `{{API TEST}}` to `BSS'26` (`tblVGGdO9QrRYi50x`), run `node src/backfill.js --table "BSS'26" --dry-run` then live, redeploy worker
+- [ ] **Re-enable invitations sync** — currently disabled in `runSync()`. May need Cloudflare paid plan ($5/mo, raises limit to 1000 subrequests)
 - [ ] **Remove `Record Type` field** from `{{Sync State}}` — no longer written, just clutter
+- [ ] **Compare SP transferer fields vs existing `Transfer From Name` / `Transferred From Email`** fields in Airtable — once data looks good in the SP* fields, decide whether to map directly or keep separate
 
 ---
 
