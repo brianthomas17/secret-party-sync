@@ -39,7 +39,7 @@ Currently only syncing **tickets** (not invitations — disabled intentionally b
 | **Account ID** | e5344b6ea83eafd3e476f25942d8326c |
 | **Cloudflare plan** | Free (50 subrequest limit per invocation) |
 | **Cron** | `*/5 * * * *` — active and running |
-| **Deploy command** | `npm run deploy` (or just push to `main` — see below) |
+| **Deploy command** | Push to `main` on GitHub — do NOT run `npm run deploy` directly |
 | **Check auth** | `npx wrangler whoami` |
 | **Tail live logs** | `npx wrangler tail` |
 
@@ -48,7 +48,7 @@ Currently only syncing **tickets** (not invitations — disabled intentionally b
 - **Repo:** https://github.com/brianthomas17/secret-party-sync (private)
 - **Auto-deploy:** Every push to `main` triggers `.github/workflows/deploy.yml` which deploys to Cloudflare via `cloudflare/wrangler-action@v3`
 - **GitHub secret required:** `CLOUDFLARE_API_TOKEN` — already set in repo secrets
-- **Bottom line:** Push to GitHub = deployed to production. No need to run `npm run deploy` manually unless testing locally.
+- **Bottom line:** Push to GitHub = deployed to production. **Do not run `npm run deploy` directly** — all deploys should go through GitHub so there's a record of what was deployed and when.
 
 ---
 
