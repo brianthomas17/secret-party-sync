@@ -111,11 +111,13 @@ async function syncEndpoint(type, spApiKey, airtableApiKey, triggeredBy) {
 export async function runSync(spApiKey, airtableApiKey, triggeredBy = 'scheduled') {
   console.log('Sync started:', new Date().toISOString());
 
-  const invitationResult = await syncEndpoint('invitations', spApiKey, airtableApiKey, triggeredBy);
+  // Invitations disabled in the Worker — 10k+ records exceeds the free plan's 50 subrequest limit.
+  // Initial load must be done via backfill.js locally. Once SP IDs are stamped on all records,
+  // re-enable this for incremental-only runs (which will be small and safe).
   const ticketResult = await syncEndpoint('tickets', spApiKey, airtableApiKey, triggeredBy);
 
   const summary = {
-    invitations: invitationResult,
+    invitations: { fetched: 0, created: 0, updated: 0 },
     tickets: ticketResult,
     timestamp: new Date().toISOString(),
   };
