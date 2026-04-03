@@ -254,10 +254,76 @@ SP returns ALL matching records in a single response (no pagination). With no cu
 - All timestamps are ISO-8601 (e.g. `2026-03-16T21:12:15.000Z`).
 - Treat all records as upserts keyed on `id`.
 
-**SP ticket fields** (full list from API):
-`id`, `product_id`, `invitation_id`, `code`, `first_name`, `last_name`, `status`, `stage`, `invites_per`, `created_at`, `updated_at`, `purchase_price`, `surcharge_fee`, `service_fee`, `processing_fee`, `total`, `transfer_fee`, `transfer_requires_payment`, `transferee_first_name`, `transferee_last_name`, `transfer_status`, `email`, `phone`, `transferee_email`, `invitation_code`, `sales_organizer_revenue_amount`, `is_checked_in`, `checkin_updated_at`, `total_unlocked_by_count`, `promotion_code`, `transferer_first_name`, `transferer_last_name`, `transferer_email`, `product` (nested: `id`, `name`, `type`, `is_transfer_allowed`), `invitation` (nested object)
+### Invitation fields
 
-SP has **1,191 tickets** and **10,271 invitations** as of April 2026.
+| SP field | Type | Airtable field | Notes |
+|---|---|---|---|
+| `id` | string | `SP ID` | merge key |
+| `code` | string | `Invite Code` | |
+| `first_name` | string\|null | `First Name` | |
+| `last_name` | string\|null | `Last Name` | |
+| `email` | string\|null | `Email` | |
+| `phone` | string\|null | `Phone` | |
+| `stage` | string | `SP Stage` | added/pending/sending/sent/opened/viewed/purchased/bounced/rejected/spam/opted-out/cancelled/duplicate/transferred |
+| `status` | string | `SP Status` | active/purchased |
+| `level` | number | `SP Level` | stored as text (Airtable field is singleLineText) |
+| `invites_per` | number\|null | `SP Invites Per` | |
+| `view_count` | number | `SP View Count` | |
+| `created_invitation_count` | number | `SP Created Invitation Count` | |
+| `claimed_ticket_count` | number | `SP Claimed Ticket Count` | |
+| `last_viewed_at` | string\|null | `SP Last Viewed At` | |
+| `created_at` | string | `SP Created At` | |
+| `updated_at` | string | `SP Updated At` | |
+| `inviter.name` | string | `SP Inviter Name` | nested |
+| `parent_invitation.id` | string | `SP Parent Invitation ID` | nested |
+| `parent_invitation.code` | string | `SP Parent Invitation Code` | nested |
+| `event_id` | string | — | not mapped (not useful) |
+| `tickets[]` | array | — | not mapped (array, not flattenable) |
+| `parent_invitation.first_name/last_name` | string\|null | — | not mapped |
+
+### Ticket fields
+
+| SP field | Type | Airtable field | Notes |
+|---|---|---|---|
+| `id` | string | `SP ID` | merge key |
+| `code` | string\|null | `Ticket Code` | |
+| `invitation_code` | string | `Invitation Code` | |
+| `invitation_id` | string | `SP Invitation ID` | |
+| `first_name` | string\|null | `First Name` | |
+| `last_name` | string\|null | `Last Name` | |
+| `email` | string\|null | `Email from SP` | |
+| `phone` | string\|null | `Phone` | |
+| `stage` | string | `SP Stage` | |
+| `status` | string | `SP Status` | active/pending/refunded/transferred/disputed |
+| `invites_per` | number\|null | `SP Invites Per` | |
+| `purchase_price` | string | `SP Purchase Price` | decimal string e.g. "0.01" |
+| `surcharge_fee` | string | `SP Surcharge Fee` | |
+| `service_fee` | string | `SP Service Fee` | |
+| `processing_fee` | string | `SP Processing Fee` | |
+| `total` | string | `SP Total` | |
+| `transfer_fee` | string | `SP Transfer Fee` | |
+| `transfer_requires_payment` | boolean\|null | `SP Transfer Requires Payment` | checkbox |
+| `transfer_status` | string\|null | `SP Transfer Status` | pending/active/complete |
+| `transferee_first_name` | string\|null | `SP Transferee First Name` | |
+| `transferee_last_name` | string\|null | `SP Transferee Last Name` | |
+| `transferee_email` | string\|null | `SP Transferee Email` | |
+| `transferer_first_name` | string\|null | `SP Transferer First Name` | |
+| `transferer_last_name` | string\|null | `SP Transferer Last Name` | |
+| `transferer_email` | string\|null | `SP Transferer Email` | |
+| `sales_organizer_revenue_amount` | string\|null | `SP Sales Organizer Revenue` | |
+| `is_checked_in` | boolean | `SP Is Checked In` | checkbox |
+| `checkin_updated_at` | string\|null | `SP Checkin At` | |
+| `total_unlocked_by_count` | number | `SP Total Unlocked By Count` | |
+| `product.name` | string | `SP Product Name` | nested |
+| `product.type` | string | `SP Product Type` | nested; ticket/add-on |
+| `product.is_transfer_allowed` | boolean | `SP Product Transfer Allowed` | nested; checkbox |
+| `created_at` | string | `SP Created At` | |
+| `updated_at` | string | `SP Updated At` | |
+| `product_id` | string | — | not mapped |
+| `promotion_code` | string | — | blocked: Airtable field is multipleSelects type, needs changing to text first |
+| `invitation` | object | — | not mapped (nested invitation object) |
+
+SP has **1,191 tickets** and **10,272 invitations** as of April 2026.
 
 ---
 

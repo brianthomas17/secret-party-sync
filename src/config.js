@@ -38,8 +38,13 @@ export const FIELD_MAP = {
     view_count: 'SP View Count',
     created_invitation_count: 'SP Created Invitation Count',
     claimed_ticket_count: 'SP Claimed Ticket Count',
+    last_viewed_at: 'SP Last Viewed At',
     created_at: 'SP Created At',
     updated_at: 'SP Updated At',
+    // Nested fields
+    'inviter.name': 'SP Inviter Name',
+    'parent_invitation.id': 'SP Parent Invitation ID',
+    'parent_invitation.code': 'SP Parent Invitation Code',
   },
   tickets: {
     id: 'SP ID',
@@ -64,10 +69,19 @@ export const FIELD_MAP = {
     transferer_first_name: 'SP Transferer First Name',
     transferer_last_name: 'SP Transferer Last Name',
     transferer_email: 'SP Transferer Email',
+    surcharge_fee: 'SP Surcharge Fee',
+    service_fee: 'SP Service Fee',
+    processing_fee: 'SP Processing Fee',
+    transfer_fee: 'SP Transfer Fee',
+    transfer_requires_payment: 'SP Transfer Requires Payment',
+    sales_organizer_revenue_amount: 'SP Sales Organizer Revenue',
+    total_unlocked_by_count: 'SP Total Unlocked By Count',
     created_at: 'SP Created At',
     updated_at: 'SP Updated At',
-    // Nested: product.name → SP Product Name
+    // Nested fields
     'product.name': 'SP Product Name',
+    'product.type': 'SP Product Type',
+    'product.is_transfer_allowed': 'SP Product Transfer Allowed',
   },
 };
 
