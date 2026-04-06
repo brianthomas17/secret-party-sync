@@ -11,12 +11,13 @@ The event is **Big Stick Shindig 2026 (BSS'26)**.
 ## Current State (as of April 2026)
 
 - Worker is **live and syncing** — tickets + invitations, every 5 minutes, incremental via cursor
-- Tickets syncing against **`{{API TEST}}`** table — not yet switched to production `BSS'26`
-- Invitations syncing into **`Current Invite List`** — 10,272 records backfilled, incremental sync active
+- Tickets syncing into **`BSS'26`** (production) — 747 records backfilled, incremental sync active
+- Invitations syncing into **`Current Invite List`** — 10,272+ records backfilled, incremental sync active
 - All SP fields mapped for both endpoints (objects/arrays stored as JSON in long text fields)
+- Add-ons filtered out — only `product.type === 'ticket'` records are synced/backfilled
+- On sync error, cursor is preserved so next run auto-retries the same window
 - GitHub auto-deploy is configured — push to `main` = deployed
 - Manual sync via Airtable button automation is working
-- Main next step: **switch tickets to production table** (`BSS'26`) when ready
 
 ---
 
@@ -27,7 +28,7 @@ Secret Party is the source of truth for tickets and invitations. Airtable is whe
 1. Running automatically every 5 minutes (cron)
 2. Available to trigger manually via an Airtable button automation
 
-Currently only syncing **tickets** (not invitations — disabled intentionally because there are 10,000+ invitations and we're working within the Cloudflare free plan's 50 subrequest limit).
+Syncing both **tickets** (into `BSS'26`) and **invitations** (into `Current Invite List`). Initial loads were done via local backfill scripts; the Worker handles incremental updates only, keeping well within the free plan's 50 subrequest limit.
 
 ---
 
@@ -72,9 +73,10 @@ To reset a secret: `npx wrangler secret put <NAME>`
 | | |
 |---|---|
 | **Base ID** | `appgvcig9jwAhim6W` |
-| **Tickets/Invitations table (test)** | `{{API TEST}}` (`tblYlEp61232FQgsF`) |
-| **Production table** | `BSS'26` (`tblVGGdO9QrRYi50x`) — NOT yet switched to |
+| **Tickets table (production)** | `BSS'26` (`tblVGGdO9QrRYi50x`) |
+| **Invitations table** | `Current Invite List` (`tblKgwXnpqWjf8Z8q`) |
 | **Sync State table** | `{{Sync State}}` (`tblT06K1k450mZ6q2`) |
+| **Test table (retired)** | `{{API TEST}}` (`tblYlEp61232FQgsF`) — no longer used by worker |
 
 ### `{{Sync State}}` table fields
 
@@ -91,17 +93,15 @@ Every sync run (cron or manual) creates a new row here. This is pure append-only
 | `Records Fetched` | number | How many records SP returned this run |
 | `Tickets Created` | number | Net new records added to Airtable |
 | `Tickets Updated` | number | Existing records matched + updated in Airtable |
-| `Invitations Created` | number | Reserved for when invitations sync is re-enabled |
-| `Invitations Updated` | number | Reserved for when invitations sync is re-enabled |
-| `Record Type` | single select | Obsolete — was used before logging refactor, no longer written |
+| `Invitations Created` | number | Net new invitation records added |
+| `Invitations Updated` | number | Existing invitation records updated |
+| `Record Type` | single select | Obsolete — no longer written, can be ignored |
 
-**Important:** There is one old cursor-only row (has `Endpoint` + `Cursor` but no `Status`, `Synced At`, etc.) from before the logging refactor. It should be deleted — it's no longer used. `getCursor` reads the most recent row where `Cursor` is not empty, sorted by `Synced At` desc.
+### `BSS'26` table (production tickets)
 
-### `{{API TEST}}` table
+The merge/dedup key is `SP ID` — a plain text field. Airtable's native `performUpsert` matches on this field to create or update. Only records where `product.type === 'ticket'` are synced (add-ons are filtered out).
 
-This is a copy of the real `BSS'26` table used for testing the sync before going to production. It has all the same SP fields. The merge/dedup key is `SP ID` — a plain text field. Airtable's native `performUpsert` matches on this field to create or update.
-
-**All SP fields are now mapped** (see `src/config.js` for full FIELD_MAP and the SP API Reference section for the complete field table):
+**All SP fields mapped** (see `src/config.js` FIELD_MAP and SP API Reference for full details):
 - `SP ID`, `Ticket Code`, `Invitation Code`, `SP Invitation ID`
 - `First Name`, `Last Name`, `Email from SP`, `Phone`
 - `SP Stage`, `SP Status`, `SP Invites Per`
@@ -113,11 +113,17 @@ This is a copy of the real `BSS'26` table used for testing the sync before going
 - `SP Promo Code`
 - `SP Created At`, `SP Updated At`
 - `SP Product Name`, `SP Product Type`, `SP Product Transfer Allowed` (nested: `product.*`)
-- `SP Invitation` (full nested invitation object stored as JSON)
+- `SP Invitation` (full nested invitation object as JSON)
 
-**Existing Airtable fields that may overlap with SP transferer fields** (to review before prod):
-- `Transfer From Name` — currently unmapped. May want to point `transferer_first_name` + `transferer_last_name` here once data is verified
-- `Transferred From Email` — currently unmapped. May want to point `transferer_email` here once data is verified
+**Existing fields not written by sync** (manually managed):
+- `Email`, `Invited By Email` — linked record fields, can't write record IDs from SP
+- `Promo Code` — multipleSelects type, use `SP Promo Code` instead
+- `Transfer From Name`, `Transferred From Email` — unmapped, may overlap with SP transferer fields
+
+### `Current Invite List` table (production invitations)
+
+The merge/dedup key is `SP ID`. All SP invitation fields mapped — see SP API Reference section.
+Note: `SP Level` is stored as text (singleLineText field) even though SP returns it as a number.
 
 ---
 
@@ -136,7 +142,7 @@ This is a copy of the real `BSS'26` table used for testing the sync before going
    - Computes `nextCursor` from `meta.next_updated_after`, nudges +1s if unchanged
    - Upserts records into Airtable in batches of 10 via `upsertRecords()`
    - Writes log row via `logSync()` — success or failure, with counts + cursor
-   - If error thrown, logs `failed` row then re-throws (so webhook returns 500)
+   - If error thrown, logs `failed` row with the **original cursor** (not advanced) so next run auto-retries, then re-throws (so webhook returns 500)
 
 ### Cursor logic
 - Cursor = ISO-8601 timestamp used as `updated_after` filter on SP API
@@ -167,7 +173,7 @@ curl -X POST https://secret-party-sync.dangles.workers.dev/sync \
 ```
 
 ### Airtable automation setup
-- Trigger: Button field clicked (in `{{API TEST}}` or `BSS'26` table)
+- Trigger: Button field clicked (in `BSS'26` or any table)
 - Action: Run script
 - In the script sidebar under **Secrets**, add:
   - Name: `webhookSecret`
@@ -216,7 +222,8 @@ src/
   airtable.js     — Airtable helpers: upsertRecords(), getCursor(), logSync()
   secretparty.js  — SP API helper: fetchRecords()
   config.js       — BASES, TABLES, MERGE_FIELDS, FIELD_MAP constants
-  backfill.js     — One-time local script to patch SP fields onto existing records
+  backfill.js              — Patches SP fields onto existing ticket records by matching Ticket Code / SP ID
+  backfill-invitations.js  — Full upsert of all SP invitations into Current Invite List
 wrangler.toml     — Cloudflare Worker config (cron schedule, compat flags)
 .dev.vars         — Local secrets for `npm run dev` (gitignored — DO NOT COMMIT)
 .dev.vars.example — Template with secret names (no values)
@@ -278,7 +285,7 @@ SP returns ALL matching records in a single response (no pagination). With no cu
 | `parent_invitation.id` | string | `SP Parent Invitation ID` | nested |
 | `parent_invitation.code` | string | `SP Parent Invitation Code` | nested |
 | `event_id` | string | — | not mapped (not useful) |
-| `tickets[]` | array | — | not mapped (array, not flattenable) |
+| `tickets[]` | array | `SP Tickets` | stored as JSON in multilineText |
 | `parent_invitation.first_name/last_name` | string\|null | — | not mapped |
 
 ### Ticket fields
@@ -320,8 +327,8 @@ SP returns ALL matching records in a single response (no pagination). With no cu
 | `created_at` | string | `SP Created At` | |
 | `updated_at` | string | `SP Updated At` | |
 | `product_id` | string | — | not mapped |
-| `promotion_code` | string | — | blocked: Airtable field is multipleSelects type, needs changing to text first |
-| `invitation` | object | — | not mapped (nested invitation object) |
+| `promotion_code` | string | `SP Promo Code` | |
+| `invitation` | object | `SP Invitation` | stored as JSON in multilineText |
 
 SP has **1,191 tickets** and **10,272 invitations** as of April 2026.
 
@@ -344,6 +351,11 @@ SP has **1,191 tickets** and **10,272 invitations** as of April 2026.
 13. Added `SP Transferer First Name`, `SP Transferer Last Name`, `SP Transferer Email` fields to Airtable and mapped in `config.js`
 14. Hardened `backfill.js` — added `--table` flag, `--dry-run` mode, rate limiting, and retry on 429
 15. Ran backfill against `{{API TEST}}` — 900/900 records matched and patched with full SP field set including transferer data
+16. Added invitations sync — 10,272 records backfilled into `Current Invite List` via `backfill-invitations.js`, incremental Worker sync enabled
+17. Added full SP field coverage — all invitation and ticket fields mapped, objects/arrays stored as JSON in multilineText fields
+18. Added add-on filter — only `product.type === 'ticket'` records synced, add-ons skipped
+19. Fixed error recovery — failed syncs now preserve original cursor so next run auto-retries
+20. Switched tickets to production `BSS'26` table — 747 records backfilled, `{{API TEST}}` retired
 
 ---
 
@@ -354,8 +366,8 @@ SP has **1,191 tickets** and **10,272 invitations** as of April 2026.
 - [x] **Remove `Record Type` field** from `{{Sync State}}` — done
 - [x] **Map `Promo Code`** — created `SP Promo Code` as singleLineText, mapped in FIELD_MAP
 - [x] **Re-enable invitations sync** — 10,272 records backfilled via `backfill-invitations.js`, incremental sync active
-- [ ] **Switch tickets to production table** — change `TABLES.tickets` in `src/config.js` from `{{API TEST}}` to `BSS'26` (`tblVGGdO9QrRYi50x`), run `node src/backfill.js --table "BSS'26" --dry-run` then live, redeploy worker
-- [ ] **Compare SP transferer fields vs existing `Transfer From Name` / `Transferred From Email`** fields in Airtable — once data looks good in the SP* fields, decide whether to map directly or keep separate
+- [x] **Switch tickets to production table** — `BSS'26` live as of April 2026, 747 records backfilled
+- [ ] **Compare SP transferer fields vs existing `Transfer From Name` / `Transferred From Email`** fields in Airtable — decide whether to map SP transferer fields there or keep them separate
 
 ---
 
@@ -387,7 +399,7 @@ The Worker's `AIRTABLE_API_KEY` (see .dev.vars) can also be used directly with `
 - **`SP ID` must stay as plain text or number** — Airtable's `performUpsert` won't work on formula, lookup, or rollup fields
 - **Airtable counts matched records as "updated"** even if no values changed — `Tickets Updated: 2` in the log ≠ actual data change
 - **`null` / `undefined` SP fields are skipped** — `mapRecord()` only writes fields that have a value. A null SP field won't overwrite an existing Airtable value (intentional — preserves manual edits)
-- **50 subrequest limit on free plan** — each external API call counts. 10 records per Airtable upsert batch. Stay aware when re-enabling invitations
+- **50 subrequest limit on free plan** — each external API call counts. 10 records per Airtable upsert batch. Both endpoints now run incrementally so this is not an issue in normal operation. Use backfill scripts for any bulk loads.
 - **Secrets are write-only in Cloudflare** — can't be read back after setting. Values stored in `.dev.vars` are the only copy
 - **Airtable `performUpsert` creates if no match** — if `SP ID` is blank on an Airtable record, every sync will create a new duplicate instead of updating. Always ensure `SP ID` is populated before going live on a new table
 - **`getCursor` sorts by `Synced At`** — if there are rows without a `Synced At` value (like the old cursor-only row), the sort may be unreliable. Delete that row.
